@@ -98,3 +98,27 @@ class PostModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
         return collection.delete_one({"_id": ObjectId(post_id)})
+
+class CommentModel:
+    def __init__(self, db_helper):
+        self.db_helper = db_helper
+
+    def get_comments_by_post(self, post_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments']
+        return collection.find({"post": ObjectId(post_id)})
+
+    def add_comment(self, comment):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments']
+        return collection.insert_one(comment)
+
+    def update_comment(self, comment_id, comment):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments']
+        return collection.update_one({"_id": ObjectId(comment_id)}, {"$set": comment})
+
+    def delete_comment(self, comment_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments']
+        return collection.delete_one({"_id": ObjectId(comment_id)})

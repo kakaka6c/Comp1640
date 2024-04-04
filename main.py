@@ -87,11 +87,29 @@ def get_posts():
             "is_anonymous": post['is_anonymous'],
             "created_at": post['created_at']
         }
-        
         json_data.append(post_data)
 
     return jsonify(json_data)
 
+@app.route('/comments/<post_id>', methods=['GET'])
+def get_comments(post_id):
+    comments = CommentModel(db_helper).get_comments_by_post(post_id)
+    json_data = []
+    for comment in comments:
+        user_id = comment['user']
+        user_info = UserModel(db_helper).get_user(user_id)
+        comment_data = {
+            "post_id": str(comment['_id']),
+            "user": {
+                "user_id": str(user_info['_id']),
+                "name": user_info.get('name', ''),
+                "email": user_info.get('email', '')
+            },
+            "comment": comment['comment'],
+            "created_at": comment['created_at']
+        }
+        json_data.append(comment_data)
+    return jsonify(json_data)
 
 if __name__ == '__main__':
     app.run(debug=True,port=5000,host='0.0.0.0')
