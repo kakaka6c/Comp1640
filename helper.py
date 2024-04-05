@@ -25,17 +25,28 @@ db = client['comp1640']
 # })
 
 # Tạo bảng Comments với ràng buộc
-db.create_collection("comments", validator={
-    "$jsonSchema": {
-        "bsonType": "object",
-        "required": ["post", "user", "comment","created_at"],
-        "properties": {
-            "comment": {"bsonType": "string"},
-            "post": {"bsonType": "objectId"},
-            "user": {"bsonType": "objectId"},
-            "created_at": {"bsonType": "date"}
-        }
-    }
-})
+# db.create_collection("comments", validator={
+#     "$jsonSchema": {
+#         "bsonType": "object",
+#         "required": ["post", "user", "comment","created_at"],
+#         "properties": {
+#             "comment": {"bsonType": "string"},
+#             "post": {"bsonType": "objectId"},
+#             "user": {"bsonType": "objectId"},
+#             "created_at": {"bsonType": "date"}
+#         }
+#     }
+# })
 
-print("Cả hai bảng 'posts' và 'comments' đã được tạo thành công.")
+# create collection likes
+# db.create_collection("likes", validator={
+#     "$jsonSchema": {
+#         "bsonType": "object",
+#         "required": ["post", "user"],
+#         "properties": {
+#             "post": {"bsonType": "objectId"},
+#             "user": {"bsonType": "objectId"},
+#             "created_at": {"bsonType": "date"}
+#         }
+#     }
+# })
