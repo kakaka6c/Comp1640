@@ -177,14 +177,14 @@ class CommentModel:
     def count_comments_for_user(self,db, user_id):
         # truy vấn tất cả comments của user dựa trên user_id
         db=self.db_helper.get_db()
-        comments = db['comp1640']['comments'].find({"user": ObjectId(user_id)})
-        return comments.count()
+        comments = db['comp1640']['comments'].count_documents({"user": ObjectId(user_id)})
+        return comments
 
     def count_comments_for_post(self,db, post_id):
         # truy vấn tất cả comments của post dựa trên post_id
         db=self.db_helper.get_db()
-        comments = db['comp1640']['comments'].find({"post": ObjectId(post_id)})
-        return comments.count()
+        comments = db['comp1640']['comments'].count_documents({"post": ObjectId(post_id)})
+        return comments
 
 class LikeModel:
     def __init__(self, db_helper):
@@ -241,12 +241,12 @@ class LikeModel:
     def count_likes_for_user(self,db, user_id):
         # truy vấn tất cả likes của user dựa trên user_id
         db=self.db_helper.get_db()
-        likes = db['comp1640']['likes'].find({"user": ObjectId(user_id)})
-        return likes.count()
+        likes = db['comp1640']['likes'].count_documents({"user": ObjectId(user_id)})
+        return likes
 
     def count_likes_for_post(self,db, post_id):
         # truy vấn tất cả likes của post dựa trên post_id
         db=self.db_helper.get_db()
-        likes = db['comp1640']['likes'].find({"post": ObjectId(post_id)})
-        return likes.count()
+        likes = db['comp1640']['likes'].count_documents({"post": ObjectId(post_id)})
+        return likes
 
