@@ -20,15 +20,12 @@ def token_to_uid(authorization_header):
     else:
         return user_id,role
 
-
-
 @app.route('/users', methods=['GET'])
 def get_users():
     # authorization_header = request.headers.get('Authorization')
     # user_id,role = token_to_uid(authorization_header)
 
     users = AdminModel(db_helper).get_users()
-    print(users)
     json_data = [ { "_id": str(user['_id']), "name": user['name'], "email": user['email'],"role": user['role']} for user in users]
     return jsonify(json_data)
 

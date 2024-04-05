@@ -1,4 +1,4 @@
-from pymongo import MongoClient
+from pymongo.mongo_client import MongoClient
 from bson import ObjectId
 
 class DatabaseHelper:
@@ -6,11 +6,11 @@ class DatabaseHelper:
         self.client = None
         if app is not None:
             self.init_app(app)
-
+        print(app.config.get('MONGO_URI'))
     def init_app(self, app):
         mongo_uri = app.config.get('MONGO_URI')
         if mongo_uri:
-            self.client = MongoClient(mongo_uri)
+            self.client = MongoClient(mongo_uri,connectTimeoutMS=30000, socketTimeoutMS=None, connect=False, maxPoolsize=1)
         else:
             raise ValueError("No MongoDB URI provided in the app configuration.")
 
@@ -32,13 +32,13 @@ class UserModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['users']
         return collection.find_one({"_id": ObjectId(user_id)})
-    
+
     def get_role_by_access_token(self, access_token):
         db = self.db_helper.get_db()
         collection = db['comp1640']['users']
         # return _id and role of user
         return collection.find_one({"access_token": access_token}, {"_id": 1, "role": 1})
-    
+
 class AdminModel:
     def __init__(self, db_helper):
         self.db_helper = db_helper
@@ -46,6 +46,8 @@ class AdminModel:
     def get_users(self):
         db = self.db_helper.get_db()
         collection = db['comp1640']['users']
+        for user in collection.find():
+            print(user)
         return collection.find()
 
     def add_user(self, user):
@@ -80,7 +82,7 @@ class FacultyModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['faculties']
         return collection.find()
-    
+
 class PostModel:
     def __init__(self, db_helper):
         self.db_helper = db_helper
@@ -138,12 +140,12 @@ class CommentModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['comments']
         return collection.delete_one({"_id": ObjectId(comment_id)})
-    
+
     def count_comment(self, post_id):
         db = self.db_helper.get_db()
         collection = db['comp1640']['comments']
         return collection.count_documents({"post": ObjectId(post_id)})
-    
+
     def count_comments_for_event(self,db, event_id):
         db=self.db_helper.get_db()
         # Truy vấn tất cả các bài post trong event dựa trên event_id
@@ -157,7 +159,7 @@ class CommentModel:
             total_comments += post.get("comments", 0)
 
         return total_comments
-    
+
     def count_comments_for_faculty(self,db, faculty_id):
         db=self.db_helper.get_db()
         # Truy vấn tất cả các bài post trong faculty dựa trên faculty_id
@@ -171,19 +173,19 @@ class CommentModel:
             total_comments += post.get("comments", 0)
 
         return total_comments
-    
+
     def count_comments_for_user(self,db, user_id):
         # truy vấn tất cả comments của user dựa trên user_id
         db=self.db_helper.get_db()
         comments = db['comp1640']['comments'].find({"user": ObjectId(user_id)})
         return comments.count()
-    
+
     def count_comments_for_post(self,db, post_id):
         # truy vấn tất cả comments của post dựa trên post_id
         db=self.db_helper.get_db()
         comments = db['comp1640']['comments'].find({"post": ObjectId(post_id)})
         return comments.count()
-    
+
 class LikeModel:
     def __init__(self, db_helper):
         self.db_helper = db_helper
@@ -207,7 +209,7 @@ class LikeModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['likes']
         return collection.delete_one({"_id": ObjectId(like_id)})
-    
+
     def count_likes_for_event(self,db, event_id):
         db=self.db_helper.get_db()
         # Truy vấn tất cả các bài post trong event dựa trên event_id
@@ -221,7 +223,7 @@ class LikeModel:
             total_likes += post.get("likes", 0)
 
         return total_likes
-    
+
     def count_likes_for_faculty(self,db, faculty_id):
         db=self.db_helper.get_db()
         # Truy vấn tất cả các bài post trong faculty dựa trên faculty_id
@@ -235,16 +237,16 @@ class LikeModel:
             total_likes += post.get("likes", 0)
 
         return total_likes
-    
+
     def count_likes_for_user(self,db, user_id):
         # truy vấn tất cả likes của user dựa trên user_id
         db=self.db_helper.get_db()
         likes = db['comp1640']['likes'].find({"user": ObjectId(user_id)})
         return likes.count()
-    
+
     def count_likes_for_post(self,db, post_id):
         # truy vấn tất cả likes của post dựa trên post_id
         db=self.db_helper.get_db()
         likes = db['comp1640']['likes'].find({"post": ObjectId(post_id)})
         return likes.count()
-    
+
