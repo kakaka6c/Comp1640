@@ -38,10 +38,7 @@ def get_user(user_id):
         # Trả về thông tin cần thiết trong định dạng JSON
         user_data = {
             'name': user['name'],
-            'phone': user['phone'],
             'email': user['email'],
-            'dateOfBirth': str(user['dateOfBirth']),
-            'gender': user['gender'],
             'faculty': user['faculty'],
             'role': user['role']
         }
@@ -274,6 +271,3 @@ def count_likes_for_user(user_id):
     count = LikeModel(db_helper).count_likes_for_user(user_id)
     return jsonify({'count': count})
 
-
-if __name__ == '__main__':
-    app.run(debug=True,port=5000,host='0.0.0.0')
