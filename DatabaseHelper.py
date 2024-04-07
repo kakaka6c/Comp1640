@@ -37,7 +37,8 @@ class UserModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['users']
         # return _id and role of user
-        return collection.find_one({"access_token": access_token}, {"_id": 1, "role": 1})
+        return collection.find_one({"accessToken": access_token}, {"_id": 1, "role": 1})
+
 
 class AdminModel:
     def __init__(self, db_helper):
@@ -92,6 +93,16 @@ class PostModel:
         collection = db['comp1640']['posts']
         return collection.find({"faculty": ObjectId(faculty_id)})
 
+    def get_posts_by_event(self, event_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['posts']
+        return collection.find({"event": ObjectId(event_id)})
+
+    def get_all_posts(self):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['posts']
+        return collection.find()
+
     def get_post(self, post_id):
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
@@ -100,6 +111,9 @@ class PostModel:
     def add_post(self, post):
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
+        post["event"] = ObjectId(post["event"])
+        post["faculty"] = ObjectId(post["faculty"])
+        post["user"] = ObjectId(post["user"])
         return collection.insert_one(post)
 
     def update_post(self, post_id, post):
@@ -146,7 +160,7 @@ class CommentModel:
         collection = db['comp1640']['comments']
         return collection.count_documents({"post": ObjectId(post_id)})
 
-    def count_comments_for_event(self,db, event_id):
+    def count_comments_for_event(self, event_id):
         db=self.db_helper.get_db()
         # Truy vấn tất cả các bài post trong event dựa trên event_id
         posts = db['comp1640']['posts'].find({"event": ObjectId(event_id)})
@@ -160,7 +174,7 @@ class CommentModel:
 
         return total_comments
 
-    def count_comments_for_faculty(self,db, faculty_id):
+    def count_comments_for_faculty(self, faculty_id):
         db=self.db_helper.get_db()
         # Truy vấn tất cả các bài post trong faculty dựa trên faculty_id
         posts = db['comp1640']['posts'].find({"faculty": ObjectId(faculty_id)})
@@ -174,13 +188,13 @@ class CommentModel:
 
         return total_comments
 
-    def count_comments_for_user(self,db, user_id):
+    def count_comments_for_user(self, user_id):
         # truy vấn tất cả comments của user dựa trên user_id
         db=self.db_helper.get_db()
         comments = db['comp1640']['comments'].count_documents({"user": ObjectId(user_id)})
         return comments
 
-    def count_comments_for_post(self,db, post_id):
+    def count_comments_for_post(self, post_id):
         # truy vấn tất cả comments của post dựa trên post_id
         db=self.db_helper.get_db()
         comments = db['comp1640']['comments'].count_documents({"post": ObjectId(post_id)})
@@ -200,17 +214,22 @@ class LikeModel:
         collection = db['comp1640']['likes']
         return collection.insert_one(like)
 
+    def is_liked(self, user_id, post_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['likes']
+        return collection.find_one({"user": ObjectId(user_id), "post": ObjectId(post_id)}) is not None
+
     def update_like(self, like_id, like):
         db = self.db_helper.get_db()
         collection = db['comp1640']['likes']
         return collection.update_one({"_id": ObjectId(like_id)}, {"$set": like})
 
-    def delete_like(self, like_id):
+    def remove_like(self, like):
         db = self.db_helper.get_db()
         collection = db['comp1640']['likes']
-        return collection.delete_one({"_id": ObjectId(like_id)})
+        return collection.delete_one(like)
 
-    def count_likes_for_event(self,db, event_id):
+    def count_likes_for_event(self, event_id):
         db=self.db_helper.get_db()
         # Truy vấn tất cả các bài post trong event dựa trên event_id
         posts = db['comp1640']['posts'].find({"event": ObjectId(event_id)})
@@ -224,7 +243,7 @@ class LikeModel:
 
         return total_likes
 
-    def count_likes_for_faculty(self,db, faculty_id):
+    def count_likes_for_faculty(self, faculty_id):
         db=self.db_helper.get_db()
         # Truy vấn tất cả các bài post trong faculty dựa trên faculty_id
         posts = db['comp1640']['posts'].find({"faculty": ObjectId(faculty_id)})
@@ -238,13 +257,13 @@ class LikeModel:
 
         return total_likes
 
-    def count_likes_for_user(self,db, user_id):
+    def count_likes_for_user(self, user_id):
         # truy vấn tất cả likes của user dựa trên user_id
         db=self.db_helper.get_db()
         likes = db['comp1640']['likes'].count_documents({"user": ObjectId(user_id)})
         return likes
 
-    def count_likes_for_post(self,db, post_id):
+    def count_likes_for_post(self, post_id):
         # truy vấn tất cả likes của post dựa trên post_id
         db=self.db_helper.get_db()
         likes = db['comp1640']['likes'].count_documents({"post": ObjectId(post_id)})
