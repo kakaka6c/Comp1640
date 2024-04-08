@@ -105,9 +105,19 @@ class FacultyModel:
         user = collection.find_one({"_id": ObjectId(user_id)})
         return user.get("faculty", None)
 
+    def count_posts_by_faculty(self, faculty_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['posts']
+        return collection.count_documents({"faculty": ObjectId(faculty_id)})
+
 class PostModel:
     def __init__(self, db_helper):
         self.db_helper = db_helper
+
+    def get_posts_by_user(self, user_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['posts']
+        return collection.find({"user": ObjectId(user_id)})
 
     def get_posts_by_faculty(self, faculty_id):
         db = self.db_helper.get_db()
@@ -122,7 +132,7 @@ class PostModel:
     def get_all_posts(self):
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
-        return collection.find()
+        return collection.find(sort=[("created_at", -1)])   
 
     def get_post(self, post_id):
         db = self.db_helper.get_db()
@@ -146,6 +156,11 @@ class PostModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
         return collection.delete_one({"_id": ObjectId(post_id)})
+
+    def count_posts_by_user(self, user_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['posts']
+        return collection.count_documents({"user": ObjectId(user_id)})
 
 class CommentModel:
     def __init__(self, db_helper):
