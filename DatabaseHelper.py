@@ -75,6 +75,16 @@ class EventModel:
         collection = db['comp1640']['events']
         return collection.find()
 
+    def get_event(self, event_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['events']
+        return collection.find_one({"_id": ObjectId(event_id)})
+    
+    def get_event_by_faculty(self, faculty_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['events']
+        return collection.find({"faculty": ObjectId(faculty_id)})
+    
 class FacultyModel:
     def __init__(self, db_helper):
         self.db_helper = db_helper
@@ -83,6 +93,17 @@ class FacultyModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['faculties']
         return collection.find()
+
+    def get_faculty(self, faculty_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['faculties']
+        return collection.find_one({"_id": ObjectId(faculty_id)})
+
+    def get_faculty_by_user(self, user_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['users']
+        user = collection.find_one({"_id": ObjectId(user_id)})
+        return user.get("faculty", None)
 
 class PostModel:
     def __init__(self, db_helper):
@@ -96,7 +117,7 @@ class PostModel:
     def get_posts_by_event(self, event_id):
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
-        return collection.find({"event": ObjectId(event_id)})
+        return collection.find({"event": ObjectId(event_id)}, sort=[("created_at", -1)])
 
     def get_all_posts(self):
         db = self.db_helper.get_db()

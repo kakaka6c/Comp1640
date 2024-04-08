@@ -2,6 +2,9 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 import os
+import time
+# os.environ["TZ"] = "Asia/Bangkok"
+# time.tzset()
 from DatabaseHelper import (
     AdminModel,
     UserModel,
@@ -10,6 +13,7 @@ from DatabaseHelper import (
     LikeModel,
     DatabaseHelper,
     EventModel,
+    FacultyModel
 )
 from bson import ObjectId
 from flask_cors import CORS
@@ -24,13 +28,15 @@ MAIN_URL="https://comp1640.pythonanywhere.com/"
 def token_to_uid(authorization_header):
     user_id = None
     token = None
+    role="guest"
     if authorization_header and authorization_header.startswith("Bearer "):
         # Tách chuỗi token từ header 'Authorization'
+
         token = authorization_header.split(" ")[1]
         data = UserModel(db_helper).get_role_by_access_token(token)
-        print(data)
         user_id = data.get("_id")
         role = data.get("role")
+
         return str(user_id), role
     else:
         return str(user_id), role
@@ -107,34 +113,38 @@ def get_all_posts():
         return jsonify({"message": "You are not allowed to view posts"}), 403
     else:
         user_id, role = token_to_uid(authorization_header)
+        print(user_id, role)
         if role != "admin":
             return jsonify({"message": "You are not allowed to view posts"}), 403
         else:
             posts = PostModel(db_helper).get_all_posts()
             json_data = []
             for post in posts:
-                user_id_post = str(post["user"])
-                # print(user_id)
-                user_info = UserModel(db_helper).get_user(user_id_post)
-                post_data = {
-                    "_id": str(post["_id"]),
-                    "user": {
-                        "_id": str(user_info["_id"]),
-                        "name": user_info.get("name", ""),
-                        "email": user_info.get("email", ""),
-                    },
-                    "is_liked": LikeModel(db_helper).is_liked(user_id, str(post["_id"])),
-                    "caption": post.get("caption", ""),
-                    "description": post.get("description", ""),
-                    "image": post.get("image", ""),
-                    "file": post.get("file", ""),
-                    "likes": post.get("likes", 0),
-                    "comments": post.get("comments", 0),
-                    "comments_list": get_comments_by_post(str(post["_id"])),
-                    "is_anonymous": post.get("is_anonymous", False),
-                    "created_at": post.get("created_at", ""),
-                }
-                json_data.append(post_data)
+                try:
+                    user_id_post = str(post["user"])
+                    # print(user_id)
+                    user_info = UserModel(db_helper).get_user(user_id_post)
+                    post_data = {
+                        "_id": str(post["_id"]),
+                        "user": {
+                            "_id": str(user_info["_id"]),
+                            "name": user_info.get("name", ""),
+                            "email": user_info.get("email", ""),
+                        },
+                        "is_liked": LikeModel(db_helper).is_liked(user_id, str(post["_id"])),
+                        "caption": post.get("caption", ""),
+                        "description": post.get("description", ""),
+                        "image": post.get("image", ""),
+                        "file": post.get("file", ""),
+                        "likes": post.get("likes", 0),
+                        "comments": post.get("comments", 0),
+                        "comments_list": get_comments_by_post(str(post["_id"])),
+                        "is_anonymous": post.get("is_anonymous", False),
+                        "created_at": post.get("created_at", ""),
+                    }
+                    json_data.append(post_data)
+                except Exception as e:
+                    print(e)
             return jsonify(json_data)
             
 # create route get all post
@@ -176,46 +186,53 @@ def add_post():
     if role != "student":
         return jsonify({"message": "You are not allowed to add post"}), 403
     else:
-        # Kiểm tra xem các trường bắt buộc có tồn tại trong yêu cầu không
-        if "caption" not in request.form or "description" not in request.form or "event" not in request.form:
-            return jsonify({"message": "Missing required fields (caption, description, event)"}), 400
-        
-        # Nhận dữ liệu post từ form
-        post_data = request.form.to_dict()
-        
-        # Nếu có hình ảnh được gửi kèm
-        if 'image' in request.files:
-            image_file = request.files['image']
-            # Lưu hình ảnh vào thư mục hoặc lưu trữ bất kỳ cơ sở dữ liệu nào bạn muốn
+        try:
+            if "caption" not in request.form or "description" not in request.form or "event" not in request.form:
+                return jsonify({"message": "Missing required fields (caption, description, event)"}), 400
             
-            # Sau đó, lưu đường dẫn hoặc thông tin cần thiết vào post_data
-            post_data['image'] = save_image(image_file)
-        
-        # Nếu có tệp tin được gửi kèm
-        if 'file' in request.files:
-            file = request.files['file']
-            # Lưu tệp tin vào thư mục hoặc lưu trữ bất kỳ cơ sở dữ liệu nào bạn muốn
+            # Nhận dữ liệu post từ form
+            post_data = request.form.to_dict()
+            # Nếu có hình ảnh được gửi kèm
+            if 'image' in request.files :
+                try:
+                    image_file = request.files['image']
+                    # Lưu hình ảnh vào thư mục hoặc lưu trữ bất kỳ cơ sở dữ liệu nào bạn muốn
+                    
+                    # Sau đó, lưu đường dẫn hoặc thông tin cần thiết vào post_data
+                    post_data['image'] = save_image(image_file)
+                except Exception as e:
+                    print(e)
+                
+            # Nếu có tệp tin được gửi kèm
+            if 'file' in request.files:
+                try:
+                    file = request.files['file']
+                    # Lưu tệp tin vào thư mục hoặc lưu trữ bất kỳ cơ sở dữ liệu nào bạn muốn
+                    
+                    # Sau đó, lưu đường dẫn hoặc thông tin cần thiết vào post_data
+                    post_data['file'] = save_file(file)
+                except Exception as e:
+                    print(e)
             
-            # Sau đó, lưu đường dẫn hoặc thông tin cần thiết vào post_data
-            post_data['file'] = save_file(file)
-        
-        # Thêm thông tin về người dùng và thời gian tạo
-        post_data["user"] = ObjectId(user_id)
-        post_data["created_at"] = datetime.now()
-        post_data["faculty"] = UserModel(db_helper).get_user(user_id)["faculty"]
-        
-        # Thêm bài viết vào cơ sở dữ liệu
-        print(post_data)
-        result = PostModel(db_helper).add_post(post_data)
-        
-        # Trả về kết quả
-        if result.inserted_id:
-            return jsonify({"message": "Post added successfully"}), 201
-        else:
+
+            # Thêm thông tin về người dùng và thời gian tạo
+            post_data["user"] = ObjectId(user_id)
+            post_data["created_at"] = datetime.now()
+            post_data["faculty"] = UserModel(db_helper).get_user(user_id)["faculty"]
+            if post_data["is_anonymous"].lower() == "true":
+                post_data["is_anonymous"] = True
+            else:
+                post_data["is_anonymous"] = False
+            result = PostModel(db_helper).add_post(post_data)
+            # Trả về kết quả
+            if result.inserted_id:
+                return jsonify({"message": "Post added successfully"}), 201
+            else:
+                return jsonify({"message": "Failed to add post"}), 400
+        except Exception as e:
             return jsonify({"message": "Failed to add post"}), 400
 
 def save_image(image_file):
-    
     if image_file:
         # Tạo thư mục nếu nó chưa tồn tại
         if not os.path.exists('assets/images'):
@@ -237,11 +254,10 @@ def save_image(image_file):
         image_file.save(filepath)
         
         # Trả về đường dẫn của ảnh đã lưu
-        return MAIN_URL+"images/"+image_file.filename
+        return MAIN_URL+"images/"+filename
     else:
         return None
-
-
+    
 def save_file(file):
     if file:
         # Tạo thư mục nếu nó chưa tồn tại
@@ -264,7 +280,7 @@ def save_file(file):
         file.save(filepath)
         
         # Trả về đường dẫn của tệp tin đã lưu
-        return MAIN_URL+"files/"+file.filename
+        return MAIN_URL+"files/"+filename
     else:
         return None
 
@@ -377,21 +393,24 @@ def add_like():
     if role != "student":
         return jsonify({"message": "You are not allowed to like"}), 403
     else:
-        like = request.json
-        # create sample json
-        like["user"] = ObjectId(user_id)
-        like["created_at"] = datetime.now()
-        like["post"] = ObjectId(like["post"])
-        
-        result = LikeModel(db_helper).add_like(like)
-        # count likes now
-        count = LikeModel(db_helper).count_likes_for_post(like["post"])
-        # update likes count
-        PostModel(db_helper).update_post(like["post"], {"likes": count})
-        # return message and current like count
-        if result:
-            return jsonify({"message": "Like added successfully", "likes": count}), 200
-        else:
+        try:
+            like = request.json
+            # create sample json
+            like["user"] = ObjectId(user_id)
+            like["created_at"] = datetime.now()
+            like["post"] = ObjectId(like["post"])
+            
+            result = LikeModel(db_helper).add_like(like)
+            # count likes now
+            count = LikeModel(db_helper).count_likes_for_post(like["post"])
+            # update likes count
+            PostModel(db_helper).update_post(like["post"], {"likes": count})
+            # return message and current like count
+            if result:
+                return jsonify({"message": "Like added successfully", "likes": count}), 200
+            else:
+                return jsonify({"message": "Failed to add like"}), 500
+        except Exception as e:
             return jsonify({"message": "Failed to add like"}), 500
 
 @app.route("/remove_like", methods=["POST"])
@@ -449,18 +468,27 @@ def get_events():
         return jsonify({"message": "You are not allowed to view events"}), 403
     else:
         user_id, role = token_to_uid(authorization_header)
-        print(role)
         if role != "student" and role != "admin":
             return jsonify({"message": "You are not allowed to view events"}), 403
         else:
-            events = EventModel(db_helper).get_events()
-            json_data = [{ "_id": str(event['_id']),
+            try:
+                faculty= FacultyModel(db_helper).get_faculty_by_user(user_id)
+                events = EventModel(db_helper).get_event_by_faculty(faculty)
+                json_data = []
+                for event in events:
+                    event_data = {
+                        "_id": str(event["_id"]),
                         "name": event.get('event_name', ''),
                         "start_at": event.get("first_closure_date", ''),
                         "end_at": event.get("final_closure_date", ''),
                         "description": event.get('event_description', '')
-                        } for event in events]
-            return jsonify(json_data)
+                    }
+                    json_data.append(event_data)
+                print(json_data)
+                
+                return jsonify(json_data)
+            except Exception as e:
+                return jsonify({"message": "Failed to get events"}), 500
 
 def get_user_info(user_id):
     user_info = UserModel(db_helper).get_user(user_id)
@@ -499,32 +527,47 @@ def get_posts_by_event(event_id):
         if role != "student" and role != "admin":
             return jsonify({"message": "You are not allowed to view posts"}), 403
         else:
+            # Lấy thông tin về sự kiện từ event_id
+            event_info = EventModel(db_helper).get_event(event_id)
+            if not event_info:
+                return jsonify({"message": "Event not found"}), 404
+            
+            event_name = event_info.get("event_name", "")
+            
+            # Lấy danh sách bài viết từ sự kiện
             posts = PostModel(db_helper).get_posts_by_event(event_id)
-            json_data = []
+            json_data = {
+                "event_name": event_name,
+                "posts": []  # Khởi tạo danh sách bài viết
+            }
             for post in posts:
-                user_id_post = str(post["user"])
-                # print(user_id)
-                user_info = UserModel(db_helper).get_user(user_id_post)
-                post_data = {
-                    "_id": str(post["_id"]),
-                    "user": {
-                        "_id": str(user_info["_id"]),
-                        "name": user_info.get("name", ""),
-                        "email": user_info.get("email", ""),
-                    },
-                    "is_liked": LikeModel(db_helper).is_liked(user_id, str(post["_id"])),
-                    "caption": post.get("caption", ""),
-                    "description": post.get("description", ""),
-                    "image": post.get("image", ""),
-                    "file": post.get("file", ""),
-                    "likes": post.get("likes", 0),
-                    "comments": post.get("comments", 0),
-                    "comments_list": get_comments_by_post(str(post["_id"])),
-                    "is_anonymous": post.get("is_anonymous", False),
-                    "created_at": post.get("created_at", ""),
-                }
-                json_data.append(post_data)
+                try:
+                    user_id_post = str(post["user"])
+                    user_info = UserModel(db_helper).get_user(user_id_post)
+                    post_data = {
+                        "_id": str(post["_id"]),
+                        "user": {
+                            "_id": str(user_info["_id"]),
+                            "name": user_info.get("name", ""),
+                            "email": user_info.get("email", ""),
+                        },
+                        "is_liked": LikeModel(db_helper).is_liked(user_id, str(post["_id"])),
+                        "caption": post.get("caption", ""),
+                        "description": post.get("description", ""),
+                        "image": post.get("image", ""),
+                        "file": post.get("file", ""),
+                        "likes": post.get("likes", 0),
+                        "comments": post.get("comments", 0),
+                        "comments_list": get_comments_by_post(str(post["_id"])),
+                        "is_anonymous": post.get("is_anonymous", False),
+                        "created_at": post.get("created_at", ""),
+                    }
+                    json_data["posts"].append(post_data)  # Thêm bài viết vào danh sách
+                except Exception as e:
+                    print(e)
+                    
             return jsonify(json_data)
+
 
 
 

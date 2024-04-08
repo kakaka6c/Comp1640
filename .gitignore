@@ -1,2 +1,6 @@
 __pycache__/
 .vscode/
+assets/images/*.jpg
+assets/images/*.png
+assets/images/*.jpeg
+assets/files/*
