@@ -41,7 +41,6 @@ def token_to_uid(authorization_header):
     else:
         return str(user_id), role
 
-
 @app.route("/users", methods=["GET"])
 def get_users():
     # authorization_header = request.headers.get('Authorization')
@@ -58,7 +57,6 @@ def get_users():
         for user in users
     ]
     return jsonify(json_data)
-
 
 @app.route("/users/<user_id>", methods=["GET"])
 def get_user(user_id):
@@ -77,7 +75,6 @@ def get_user(user_id):
     else:
         return jsonify({"error": "User not found"}), 404
 
-
 @app.route("/add_user", methods=["POST"])
 def add_user():
     user = request.json
@@ -87,7 +84,6 @@ def add_user():
     else:
         return jsonify({"message": "Failed to add user"}), 400
 
-
 @app.route("/update_user/<user_id>", methods=["PUT"])
 def update_user(user_id):
     user = request.json
@@ -96,7 +92,6 @@ def update_user(user_id):
         return jsonify({"message": "User updated successfully"}), 200
     else:
         return jsonify({"message": "Failed to update user"}), 400
-
 
 @app.route("/delete_user/<user_id>", methods=["DELETE"])
 def delete_user(user_id):
@@ -131,7 +126,7 @@ def get_all_posts():
                             "name": user_info.get("name", ""),
                             "email": user_info.get("email", ""),
                         },
-                        "is_liked": LikeModel(db_helper).is_liked(user_id, str(post["_id"])),
+                        "is_liked": LikeModel(db_helper).is_liked(user_id +"_"+str(post["_id"])),
                         "caption": post.get("caption", ""),
                         "description": post.get("description", ""),
                         "image": post.get("image", ""),
@@ -173,7 +168,7 @@ def get_posts():
                             "name": user_info.get("name", ""),
                             "email": user_info.get("email", ""),
                         },
-                        "is_liked": LikeModel(db_helper).is_liked(user_id, str(post["_id"])),
+                        "is_liked": LikeModel(db_helper).is_liked(user_id +"_"+str(post["_id"])),
                         "caption": post.get("caption", ""),
                         "description": post.get("description", ""),
                         "image": post.get("image", ""),
@@ -425,8 +420,15 @@ def add_like():
             like["user"] = ObjectId(user_id)
             like["created_at"] = datetime.now()
             like["post"] = ObjectId(like["post"])
-            
-            result = LikeModel(db_helper).add_like(like)
+            like["like_id"] = user_id+"_"+str(like["post"])
+            # check if user liked this post before
+            # if LikeModel(db_helper).is_liked(like["l +"_"+e_id"]):
+            #     return jsonify({"message": "You have already liked this post"}), 400
+            try:
+                result = LikeModel(db_helper).add_like(like)
+            except Exception as e:
+                print(e)
+                return jsonify({"message": "You want to spam like ?????"}), 500
             # count likes now
             count = LikeModel(db_helper).count_likes_for_post(like["post"])
             # update likes count
@@ -437,6 +439,7 @@ def add_like():
             else:
                 return jsonify({"message": "Failed to add like"}), 500
         except Exception as e:
+            print(e)
             return jsonify({"message": "Failed to add like"}), 500
 
 @app.route("/remove_like", methods=["POST"])
@@ -449,9 +452,11 @@ def remove_like():
         like = request.json
         like["user"] = ObjectId(user_id)
         like["post"] = ObjectId(like["post"])
-        
-        # Xóa like từ bảng
-        result = LikeModel(db_helper).remove_like(like)
+        like["like_id"] = str(like["user"])+"_"+str(like["post"])
+        # check if user liked this post before
+        if not LikeModel(db_helper).is_liked(like["like_id"]):
+            return jsonify({"message": "You have not liked this post"}), 400
+        result = LikeModel(db_helper).remove_like(like["like_id"])
         if not result:
             return jsonify({"message": "Failed to remove like"}), 500
         
@@ -573,7 +578,7 @@ def get_posts_by_event(event_id):
                             "name": user_info.get("name", ""),
                             "email": user_info.get("email", ""),
                         },
-                        "is_liked": LikeModel(db_helper).is_liked(user_id, str(post["_id"])),
+                        "is_liked": LikeModel(db_helper).is_liked(user_id +"_"+str(post["_id"])),
                         "caption": post.get("caption", ""),
                         "description": post.get("description", ""),
                         "image": post.get("image", None),

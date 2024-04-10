@@ -250,20 +250,20 @@ class LikeModel:
         collection = db['comp1640']['likes']
         return collection.insert_one(like)
 
-    def is_liked(self, user_id, post_id):
+    def is_liked(self, like_id):
         db = self.db_helper.get_db()
         collection = db['comp1640']['likes']
-        return collection.find_one({"user": ObjectId(user_id), "post": ObjectId(post_id)}) is not None
+        return collection.find_one({"like_id":like_id}) is not None
 
     def update_like(self, like_id, like):
         db = self.db_helper.get_db()
         collection = db['comp1640']['likes']
         return collection.update_one({"_id": ObjectId(like_id)}, {"$set": like})
 
-    def remove_like(self, like):
+    def remove_like(self, like_id):
         db = self.db_helper.get_db()
         collection = db['comp1640']['likes']
-        return collection.delete_one(like)
+        return collection.delete_one({"like_id": like_id})
 
     def count_likes_for_event(self, event_id):
         db=self.db_helper.get_db()
