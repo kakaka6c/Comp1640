@@ -2,6 +2,8 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 import os
 import time
+import utils
+import threading
 # os.environ["TZ"] = "Asia/Bangkok"
 # time.tzset()
 from DatabaseHelper import (
@@ -12,7 +14,8 @@ from DatabaseHelper import (
     LikeModel,
     DatabaseHelper,
     EventModel,
-    FacultyModel
+    FacultyModel,
+    CoordinatorModel,
 )
 from bson import ObjectId
 from flask_cors import CORS
@@ -109,7 +112,7 @@ def get_all_posts():
     else:
         user_id, role = token_to_uid(authorization_header)
         # print(user_id, role)
-        if role != "admin":
+        if role != "admin" and role != "marketing manage":
             return jsonify({"message": "You are not allowed to view posts"}), 403
         else:
             posts = PostModel(db_helper).get_all_posts()
@@ -229,13 +232,21 @@ def add_post():
             else:
                 post_data["is_anonymous"] = False
             result = PostModel(db_helper).add_post(post_data)
-            # Trả về kết quả
             if result.inserted_id:
+                user_name=UserModel(db_helper).get_user(user_id)["name"]
+                threading.Thread(target=send_email, args=(user_name+" đã đăng một bài viết mới trên Greenwich Blog. Title: "+post_data["caption"]+".Hãy vào check nhé !!!",)).start()
                 return jsonify({"message": "Post added successfully"}), 201
             else:
                 return jsonify({"message": "Failed to add post"}), 400
         except Exception as e:
+            print(e)
             return jsonify({"message": "Failed to add post"}), 400
+
+def send_email(body):
+    coordinators=CoordinatorModel(db_helper).get_coordinators()
+    for coordinator in coordinators:
+        utils.send_email(coordinator["email"], body)
+    return True
 
 def save_image(image_file):
     if image_file:
@@ -316,7 +327,7 @@ def add_comment():
     try:
         authorization_header = request.headers.get("Authorization")
         user_id, role = token_to_uid(authorization_header)
-        if role != "student":
+        if role != "student" and "coordinator" not in role:
             return jsonify({"message": "You are not allowed to add comment"}), 403
         else:
             comment = request.json
@@ -332,6 +343,11 @@ def add_comment():
             except Exception as e:
                 return jsonify({"message": "Invalid ObjectId format"}), 400
 
+            # Check to see if the post has existed for more than 14 days
+            post = PostModel(db_helper).get_post(comment["post"])
+            if is_in_14days(post["created_at"]) and "coordinator" in role:
+                return jsonify({"message": "Comment time has expired."}), 403
+            
             # Thêm trường created_at nếu không được cung cấp
             if "created_at" not in comment:
                 comment["created_at"] = datetime.now()
@@ -373,16 +389,61 @@ def add_comment():
 @app.route("/delete_comment/<comment_id>", methods=["DELETE"])
 def delete_comment(comment_id):
     comment = CommentModel(db_helper).get_comment(comment_id)
-    post = PostModel(db_helper).get(comment["post"])
-    result = CommentModel(db_helper).delete_comment(comment_id)
-    if result:
+    if not comment:
+        return jsonify({"message": "Comment not found"}), 404
+    authorization_header = request.headers.get("Authorization")
+    user_id, role = token_to_uid(authorization_header)
+    if role != "student":
+        return jsonify({"message": "You are not allowed to delete comment"}), 403
+    else:
+        if str(comment["user"]) != user_id:
+            return jsonify({"message": "You are not allowed to delete this comment"}), 403
+        result = CommentModel(db_helper).delete_comment(comment_id)
+        if not result:
+            return jsonify({"message": "Failed to delete comment"}), 500
+        post = PostModel(db_helper).get_post(comment["post"])
         PostModel(db_helper).update_post(
             comment["post"], {"comments": post["comments"] - 1}
         )
-        return jsonify({"message": "Comment deleted successfully"}), 200
-    else:
-        return jsonify({"message": "Failed to delete comment"}), 500
+        count_comment=CommentModel(db_helper).count_comment(comment["post"])
+        comment_list=get_comments_by_post(comment["post"])
+        return (
+            jsonify(
+                {
+                    "message": "Comment deleted successfully",
+                    "comments": count_comment,
+                    "comment_list": comment_list,
+                }
+            ),
+            200,
+        )
 
+@app.route("/update_comment/<comment_id>", methods=["PUT"])
+def update_comment(comment_id):
+    content = request.json.get("comment", "")
+    comment = CommentModel(db_helper).get_comment(comment_id)
+    if not comment:
+        return jsonify({"message": "Comment not found"}), 404
+    authorization_header = request.headers.get("Authorization")
+    user_id, role = token_to_uid(authorization_header)
+    if role != "student":
+        return jsonify({"message": "You are not allowed to delete comment"}), 403
+    else:
+        result = CommentModel(db_helper).update_comment(comment_id, content)
+        if not result:
+            return jsonify({"message": "Failed to delete comment"}), 500
+        count_comment=CommentModel(db_helper).count_comment(comment["post"])
+        comment_list=get_comments_by_post(comment["post"])
+        return (
+            jsonify(
+                {
+                    "message": "Comment deleted successfully",
+                    "comments": count_comment,
+                    "comment_list": comment_list,
+                }
+            ),
+            200,
+        )
 # create route count comments by post
 @app.route("/count_comments/<post_id>", methods=["GET"])
 def count_comments(post_id):
@@ -538,7 +599,7 @@ def get_comments_by_post(post_id):
                 "email": user_info.get("email", ""),
             },
             "comment": comment["comment"],
-            "created_at": str(comment["created_at"]),
+            "created_at": calculate_time_difference(str(comment["created_at"])),
         }
         json_data.append(comment_data)
     return json_data
@@ -598,18 +659,14 @@ def get_posts_by_event(event_id):
 def calculate_time_difference(timestamp_str):
     # Chuyển timestamp từ chuỗi thành đối tượng datetime
     dt_timestamp = datetime.strptime(str(timestamp_str), "%Y-%m-%d %H:%M:%S.%f")
-    
     # Lấy thời gian hiện tại
     dt_now = datetime.now()
-    
     # Tính toán khoảng cách thời gian giữa timestamp và thời gian hiện tại
     time_difference = dt_now - dt_timestamp
-    
     # Chuyển đổi thời gian thành phút, giờ, ngày
     minutes = int(time_difference.total_seconds() / 60)
     hours = int(minutes / 60)
     days = int(hours / 24)
-    
     # Xử lý kết quả
     if days > 0:
         return f"{days}d"
@@ -661,24 +718,50 @@ def count_posts_cordinator(userId):
     count = PostModel(db_helper).count_posts_by_user(userId)
     return jsonify({"count": count})
 
-# ###### Admin ######
-@app.route("/get_posts_percent", methods=["GET"])
-def get_posts_percent():
-    posts = PostModel(db_helper).get_all_posts()
-    posts_by_faculty = {}
-    total_posts = 0
-    for post in posts:
-        total_posts += 1
-        faculty = post.get("faculty", "")
-        if faculty not in posts_by_faculty:
-            posts_by_faculty[faculty] = {"total_posts": 0, "posts_count": 0}
-        posts_by_faculty[faculty]["total_posts"] += 1
-    json_data = []
-    for faculty, data in posts_by_faculty.items():
-        percent = (data["total_posts"] / total_posts) * 100
-        faculty_name = FacultyModel(db_helper).get_faculty(faculty)["faculty_name"]
-        json_data.append({"faculty": faculty_name, "total_posts": data["total_posts"], "percent": percent})
-    return jsonify(json_data)
+@app.route("/load_posts_cordinator", methods=["GET"])
+def load_posts_cordinator():
+    authorization_header = request.headers.get("Authorization")
+    user_id, role = token_to_uid(authorization_header)
+    if "coordinator" not in role:
+        return jsonify({"message": "You are not allowed to view posts"}), 403
+    else:
+        try:
+            faculty=UserModel(db_helper).get_user(user_id)["faculty"]
+            posts = PostModel(db_helper).get_posts_by_faculty(faculty)
+            json_data = []
+            for post in posts:
+                user_id_post = str(post["user"])
+                user_info = UserModel(db_helper).get_user(user_id_post)
+                post_data = {
+                    "_id": str(post["_id"]),
+                    "user": {
+                        "_id": str(user_info["_id"]),
+                        "name": user_info.get("name", ""),
+                        "email": user_info.get("email", ""),
+                    },
+                    "caption": post.get("caption", ""),
+                    "description": post.get("description", ""),
+                    "image": post.get("image", ""),
+                    "file": post.get("file", ""),
+                    "likes": post.get("likes", 0),
+                    "comments": post.get("comments", 0),
+                    "comments_list": get_comments_by_post(str(post["_id"])),
+                    "is_anonymous": post.get("is_anonymous", False),
+                    "created_at": calculate_time_difference(post.get("created_at", "")),
+                }
+                json_data.append(post_data)
+            return jsonify(json_data)
+        except Exception as e:
+            return jsonify({"message": "Failed to get posts"}), 500
+
+def is_in_14days(date):
+    date = datetime.strptime(date, "%Y-%m-%d")
+    now = datetime.now()
+    delta = now - date
+    if delta.days <= 14:
+        return True
+    return False
+
 
 if __name__ == "__main__":
     app.run(debug=True,host="0.0.0.0",port=5000)

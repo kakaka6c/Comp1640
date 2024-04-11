@@ -39,7 +39,6 @@ class UserModel:
         # return _id and role of user
         return collection.find_one({"accessToken": access_token}, {"_id": 1, "role": 1})
 
-
 class AdminModel:
     def __init__(self, db_helper):
         self.db_helper = db_helper
@@ -184,7 +183,7 @@ class CommentModel:
     def update_comment(self, comment_id, comment):
         db = self.db_helper.get_db()
         collection = db['comp1640']['comments']
-        return collection.update_one({"_id": ObjectId(comment_id)}, {"$set": comment})
+        return collection.update_one({"_id": ObjectId(comment_id)}, {"$set": {"comment": comment}})
 
     def delete_comment(self, comment_id):
         db = self.db_helper.get_db()
@@ -305,3 +304,16 @@ class LikeModel:
         likes = db['comp1640']['likes'].count_documents({"post": ObjectId(post_id)})
         return likes
 
+class CoordinatorModel:
+    def __init__(self, db_helper):
+        self.db_helper = db_helper
+
+    def get_coordinators(self):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['users']
+        return collection.find({"role": "marketing coordinator"})
+
+    def get_coordinator(self, coordinator_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['users']
+        return collection.find_one({"_id": ObjectId(coordinator_id)})
