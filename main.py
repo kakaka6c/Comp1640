@@ -154,7 +154,7 @@ def get_posts():
         return jsonify({"message": "You are not allowed to view posts"}), 403
     else:
         user_id, role = token_to_uid(authorization_header)
-        if role != "student" and role != "admin":
+        if role != "student" and role != "marketing coordinator":
             return jsonify({"message": "You are not allowed to view posts"}), 403
         else:
             try:
