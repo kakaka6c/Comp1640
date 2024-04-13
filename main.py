@@ -112,7 +112,7 @@ def get_all_posts():
     else:
         user_id, role = token_to_uid(authorization_header)
         # print(user_id, role)
-        if role != "admin" and role != "marketing manage":
+        if role != "admin" and role != "marketing manager" and role != "marketing coordinator":
             return jsonify({"message": "You are not allowed to view posts"}), 403
         else:
             posts = PostModel(db_helper).get_all_posts()
@@ -762,6 +762,43 @@ def is_in_14days(date):
         return True
     return False
 
+# create api search title
+@app.route("/search_title", methods=["GET"])
+def search_title():
+    authorization_header = request.headers.get("Authorization")
+    user_id, role = token_to_uid(authorization_header)
+    if role != "student" and role != "admin" and role != "marketing coordinator" and role != "marketing manager" and role != "cordinator":
+        return jsonify({"message": "You are not allowed to search"}), 403
+    else:
+        try:
+            title = request.args.get("title", "")
+            posts = PostModel(db_helper).search_title(title)
+            json_data = []
+            for post in posts:
+                user_id_post = str(post["user"])
+                user_info = UserModel(db_helper).get_user(user_id_post)
+                post_data = {
+                    "_id": str(post["_id"]),
+                    "user": {
+                        "_id": str(user_info["_id"]),
+                        "name": user_info.get("name", ""),
+                        "email": user_info.get("email", ""),
+                    },
+                    "is_liked": LikeModel(db_helper).is_liked(user_id +"_"+str(post["_id"])),
+                    "caption": post.get("caption", ""),
+                    "description": post.get("description", ""),
+                    "image": post.get("image", ""),
+                    "file": post.get("file", ""),
+                    "likes": post.get("likes", 0),
+                    "comments": post.get("comments", 0),
+                    "comments_list": get_comments_by_post(str(post["_id"])),
+                    "is_anonymous": post.get("is_anonymous", False),
+                    "created_at": calculate_time_difference(post.get("created_at", "")),
+                }
+                json_data.append(post_data)
+            return jsonify(json_data)
+        except Exception as e:
+            return jsonify({"message": "Failed to search"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True,host="0.0.0.0",port=5000)

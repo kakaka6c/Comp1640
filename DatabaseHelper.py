@@ -161,6 +161,12 @@ class PostModel:
         collection = db['comp1640']['posts']
         return collection.count_documents({"user": ObjectId(user_id)})
 
+    def search_title(self, title):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['posts']
+        # find all posts that contain the title
+        return collection.find({"caption": {"$regex": title, "$options": "i"}})
+
 class CommentModel:
     def __init__(self, db_helper):
         self.db_helper = db_helper
