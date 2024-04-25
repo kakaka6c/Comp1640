@@ -6,8 +6,7 @@ sender_email = 'v-maria77@hotmail.com'
 sender_password = 'Phong24052001'
 smtp_server = 'smtp-mail.outlook.com'
 smtp_port = 587  # Change this if your SMTP server uses a different port
-subject = 'Có 1 bài viết mới trên Greenwich Blog'
-def send_email(recipient_email, body):
+def send_email(recipient_email, body,subject='Có 1 bài viết mới trên Greenwich Blog'):
     try:
         # Create message container
         msg = MIMEMultipart()

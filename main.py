@@ -1,4 +1,5 @@
 from datetime import datetime
+import random
 from flask import Flask, request, jsonify
 import os
 import time
@@ -16,6 +17,7 @@ from DatabaseHelper import (
     EventModel,
     FacultyModel,
     CoordinatorModel,
+    CommentPendingModel
 )
 from bson import ObjectId
 from flask_cors import CORS
@@ -107,43 +109,54 @@ def delete_user(user_id):
 @app.route("/all_posts", methods=["GET"])
 def get_all_posts():
     authorization_header = request.headers.get("Authorization")
+    role=""
     if not authorization_header:
-        return jsonify({"message": "You are not allowed to view posts"}), 403
+        role="guests"
+    if role == "guests":
+        pass
     else:
         user_id, role = token_to_uid(authorization_header)
-        # print(user_id, role)
-        if role != "admin" and role != "marketing manager" and role != "marketing coordinator":
-            return jsonify({"message": "You are not allowed to view posts"}), 403
-        else:
-            posts = PostModel(db_helper).get_all_posts()
-            json_data = []
-            for post in posts:
-                try:
-                    user_id_post = str(post["user"])
-                    # print(user_id)
-                    user_info = UserModel(db_helper).get_user(user_id_post)
-                    post_data = {
-                        "_id": str(post["_id"]),
-                        "user": {
-                            "_id": str(user_info["_id"]),
-                            "name": user_info.get("name", ""),
-                            "email": user_info.get("email", ""),
-                        },
-                        "is_liked": LikeModel(db_helper).is_liked(user_id +"_"+str(post["_id"])),
-                        "caption": post.get("caption", ""),
-                        "description": post.get("description", ""),
-                        "image": post.get("image", ""),
-                        "file": post.get("file", ""),
-                        "likes": post.get("likes", 0),
-                        "comments": post.get("comments", 0),
-                        "comments_list": get_comments_by_post(str(post["_id"])),
-                        "is_anonymous": post.get("is_anonymous", False),
-                        "created_at": calculate_time_difference(post.get("created_at", "")),
-                    }
-                    json_data.append(post_data)
-                except Exception as e:
-                    print(e)
-            return jsonify(json_data)
+    # print(user_id, role)
+    if role != "admin" and role != "marketing manager" and role != "marketing coordinator" and role != "guests":
+        return jsonify({"message": "You are not allowed to view posts"}), 403
+    else:
+        posts = PostModel(db_helper).get_all_posts()
+        json_data = []
+        for post in posts:
+            try:
+                user_id_post = str(post["user"])
+                # print(user_id)
+                if role == "guests":
+                    is_like=False
+                else:
+                    is_like =LikeModel(db_helper).is_liked(user_id +"_"+str(post["_id"]))
+                # print(is_like)
+                user_info = UserModel(db_helper).get_user(user_id_post)
+                event_name=EventModel(db_helper).get_event(post["event"])["event_name"]
+                event_id=post["event"]
+                post_data = {
+                    "_id": str(post["_id"]),
+                    "user": {
+                        "_id": str(user_info["_id"]),
+                        "name": user_info.get("name", ""),
+                        "email": user_info.get("email", ""),
+                    },
+                    "event_name": event_name,
+                    "event_id": str(event_id),
+                    "is_liked": is_like,
+                    "image": post.get("image", ""),
+                    "file": post.get("file", ""),
+                    "likes": post.get("likes", 0),
+                    "comments": post.get("comments", 0),
+                    "comments_list": get_comments_by_post(str(post["_id"])),
+                    "is_anonymous": post.get("is_anonymous", False),
+                    "created_at": calculate_time_difference(post.get("created_at", "")),
+                }
+                json_data.append(post_data)
+
+            except Exception as e:
+                print(e)
+        return jsonify(json_data)
             
 # create route get all post
 @app.route("/get_posts", methods=["GET"])
@@ -159,11 +172,13 @@ def get_posts():
         else:
             try:
                 faculty = FacultyModel(db_helper).get_faculty_by_user(user_id)
-                posts = PostModel(db_helper).get_posts_by_faculty(faculty)
+                posts = PostModel(db_helper).get_posts_by_faculty(faculty,"published")
                 json_data = []
                 for post in posts:
                     user_id_post = str(post["user"])
                     user_info = UserModel(db_helper).get_user(user_id_post)
+                    event_name=EventModel(db_helper).get_event(post["event"])["event_name"]
+                    event_id=post["event"]
                     post_data = {
                         "_id": str(post["_id"]),
                         "user": {
@@ -172,8 +187,8 @@ def get_posts():
                             "email": user_info.get("email", ""),
                         },
                         "is_liked": LikeModel(db_helper).is_liked(user_id +"_"+str(post["_id"])),
-                        "caption": post.get("caption", ""),
-                        "description": post.get("description", ""),
+                        "event_name": event_name,
+                        "event_id": str(event_id),
                         "image": post.get("image", ""),
                         "file": post.get("file", ""),
                         "likes": post.get("likes", 0),
@@ -187,6 +202,42 @@ def get_posts():
             except Exception as e:
                 return jsonify({"message": "Failed to get posts"}), 500
 
+@app.route("/get_my_posts/<status>", methods=["GET"])
+def get_my_posts(status):
+    authorization_header = request.headers.get("Authorization")
+    user_id, role = token_to_uid(authorization_header)
+    if role != "student":
+        return jsonify({"message": "You are not allowed to view posts"}), 403
+    else:
+        try:
+            posts = PostModel(db_helper).get_posts_by_user(user_id,status)
+            json_data = []
+            for post in posts:
+                user_id_post = str(post["user"])
+                user_info = UserModel(db_helper).get_user(user_id_post)
+                event_name=EventModel(db_helper).get_event(post["event"])["event_name"]
+                event_id=post["event"]
+                post_data = {
+                    "_id": str(post["_id"]),
+                    "user": {
+                        "_id": str(user_info["_id"]),
+                        "name": user_info.get("name", ""),
+                        "email": user_info.get("email", ""),
+                    },
+                    "event_name": event_name,
+                    "event_id": str(event_id),
+                    "image": post.get("image", ""),
+                    "file": post.get("file", ""),
+                    "comments": post.get("comments", 0),
+                    "comments_list": get_comment_pending_by_post(str(post["_id"])),
+                    "is_anonymous": post.get("is_anonymous", False),
+                    "created_at": calculate_time_difference(post.get("created_at", "")),
+                }
+                json_data.append(post_data)
+            return jsonify(json_data)
+        except Exception as e:
+            return jsonify({"message": "Failed to get posts"}), 500
+
 # create route add post
 @app.route("/add_post", methods=["POST"])
 def add_post():
@@ -196,34 +247,42 @@ def add_post():
         return jsonify({"message": "You are not allowed to add post"}), 403
     else:
         try:
-            if "caption" not in request.form or "description" not in request.form or "event" not in request.form:
-                return jsonify({"message": "Missing required fields (caption, description, event)"}), 400
+            if "event" not in request.form:
+                return jsonify({"message": "Missing required fields (event)"}), 400
             
             # Nhận dữ liệu post từ form
             post_data = request.form.to_dict()
+            
             # Nếu có hình ảnh được gửi kèm
-            if 'image' in request.files :
-                try:
-                    image_file = request.files['image']
-                    # Lưu hình ảnh vào thư mục hoặc lưu trữ bất kỳ cơ sở dữ liệu nào bạn muốn
-                    
-                    # Sau đó, lưu đường dẫn hoặc thông tin cần thiết vào post_data
-                    post_data['image'] = save_image(image_file)
-                except Exception as e:
-                    print(e)
+            if 'images' in request.files:
+                image_files = request.files.getlist('images')
+                # print(image_files)
+                images=""
+                for image_file in image_files:
+                    try:
+                        # Lưu hình ảnh vào thư mục hoặc lưu trữ bất kỳ cơ sở dữ liệu nào bạn muốn
+                        # Sau đó, lưu đường dẫn hoặc thông tin cần thiết vào images list
+                        images+=save_image(image_file)+","
+                    except Exception as e:
+                        print(e)
+                # print(images)
+                post_data['image'] = images[:-1]
                 
             # Nếu có tệp tin được gửi kèm
-            if 'file' in request.files:
-                try:
-                    file = request.files['file']
-                    # Lưu tệp tin vào thư mục hoặc lưu trữ bất kỳ cơ sở dữ liệu nào bạn muốn
-                    
-                    # Sau đó, lưu đường dẫn hoặc thông tin cần thiết vào post_data
-                    post_data['file'] = save_file(file)
-                except Exception as e:
-                    print(e)
+            if 'documents' in request.files:
+                file_files = request.files.getlist('documents')
+                files = ""
+                for file in file_files:
+                    try:
+                        # Lưu tệp tin vào thư mục hoặc lưu trữ bất kỳ cơ sở dữ liệu nào bạn muốn
+                        # Sau đó, lưu đường dẫn hoặc thông tin cần thiết vào files list
+                        files+=save_file(file)+","
+                    except Exception as e:
+                        print(e)
+                post_data['file'] = files[:-1]
+                
             # Thêm thông tin về người dùng và thời gian tạo
-            post_data["user"] = ObjectId(user_id)
+            post_data["user"] = user_id
             # Get faculty xong sau đó sẽ thêm faculty vào form
             post_data["created_at"] = datetime.now()
             post_data["faculty"] = UserModel(db_helper).get_user(user_id)["faculty"]
@@ -231,10 +290,13 @@ def add_post():
                 post_data["is_anonymous"] = True
             else:
                 post_data["is_anonymous"] = False
+            post_data["status"] = "pending"
+            # print("post_data >>>>>>",post_data)
             result = PostModel(db_helper).add_post(post_data)
+            
             if result.inserted_id:
                 user_name=UserModel(db_helper).get_user(user_id)["name"]
-                threading.Thread(target=send_email, args=(user_name+" đã đăng một bài viết mới trên Greenwich Blog. Title: "+post_data["caption"]+".Hãy vào check nhé !!!",)).start()
+                threading.Thread(target=send_email, args=(user_name+" đã đăng một bài viết mới trên Greenwich Blog.Hãy vào check nhé !!!",)).start()
                 return jsonify({"message": "Post added successfully"}), 201
             else:
                 return jsonify({"message": "Failed to add post"}), 400
@@ -259,9 +321,9 @@ def save_image(image_file):
         
         # Lấy phần mở rộng của ảnh
         image_extension = os.path.splitext(image_file.filename)[1]
-        
+        random_number = str(random.randint(100000, 999999))
         # Đặt tên cho ảnh
-        filename = f"Image_{timestamp}{image_extension}"
+        filename = f"Image_{timestamp}_{random_number}{image_extension}"
         
         # Tạo đường dẫn đầy đủ đến ảnh
         filepath = os.path.join('assets/images', filename)
@@ -285,9 +347,9 @@ def save_file(file):
         
         # Lấy phần mở rộng của tệp tin
         file_extension = os.path.splitext(file.filename)[1]
-        
+        random_number = str(random.randint(100000, 999999))
         # Đặt tên cho tệp tin
-        filename = f"File_{timestamp}{file_extension}"
+        filename = f"File_{timestamp}_{random_number}{file_extension}"
         
         # Tạo đường dẫn đầy đủ đến tệp tin
         filepath = os.path.join('assets/files', filename)
@@ -345,8 +407,6 @@ def add_comment():
 
             # Check to see if the post has existed for more than 14 days
             post = PostModel(db_helper).get_post(comment["post"])
-            if is_in_14days(post["created_at"]) and "coordinator" in role:
-                return jsonify({"message": "Comment time has expired."}), 403
             
             # Thêm trường created_at nếu không được cung cấp
             if "created_at" not in comment:
@@ -604,6 +664,25 @@ def get_comments_by_post(post_id):
         json_data.append(comment_data)
     return json_data
 
+def get_comment_pending_by_post(post_id):
+    comments = CommentPendingModel(db_helper).get_comments_by_post(post_id)
+    json_data = []
+    for comment in comments:
+        user_id = comment["user"]
+        user_info = UserModel(db_helper).get_user(user_id)
+        comment_data = {
+            "_id": str(comment["_id"]),
+            "user": {
+                "_id": str(user_info["_id"]),
+                "name": user_info.get("name", ""),
+                "email": user_info.get("email", ""),
+            },
+            "comment": comment["comment"],
+            "created_at": calculate_time_difference(str(comment["created_at"])),
+        }
+        json_data.append(comment_data)
+    return json_data
+
 # create route get post from event
 @app.route("/posts/event/<event_id>", methods=["GET"])
 def get_posts_by_event(event_id):
@@ -616,6 +695,7 @@ def get_posts_by_event(event_id):
             return jsonify({"message": "You are not allowed to view posts"}), 403
         else:
             # Lấy thông tin về sự kiện từ event_id
+            
             event_info = EventModel(db_helper).get_event(event_id)
             if not event_info:
                 return jsonify({"message": "Event not found"}), 404
@@ -730,8 +810,15 @@ def load_posts_cordinator():
             posts = PostModel(db_helper).get_posts_by_faculty(faculty)
             json_data = []
             for post in posts:
+                if post["status"] == "published":
+                    comment_list=get_comments_by_post(str(post["_id"]))
+                else:
+                    comment_list=get_comment_pending_by_post(str(post["_id"]))
                 user_id_post = str(post["user"])
                 user_info = UserModel(db_helper).get_user(user_id_post)
+                event_name=EventModel(db_helper).get_event(post["event"])["event_name"]
+                event_id=post["event"]
+                
                 post_data = {
                     "_id": str(post["_id"]),
                     "user": {
@@ -739,20 +826,70 @@ def load_posts_cordinator():
                         "name": user_info.get("name", ""),
                         "email": user_info.get("email", ""),
                     },
-                    "caption": post.get("caption", ""),
+                    "status": post.get("status", "pending"),
                     "description": post.get("description", ""),
                     "image": post.get("image", ""),
+                    "event_name": event_name,
+                    "event_id": str(event_id),
                     "file": post.get("file", ""),
-                    "likes": post.get("likes", 0),
-                    "comments": post.get("comments", 0),
-                    "comments_list": get_comments_by_post(str(post["_id"])),
+                    "comments_list": comment_list,
                     "is_anonymous": post.get("is_anonymous", False),
                     "created_at": calculate_time_difference(post.get("created_at", "")),
                 }
                 json_data.append(post_data)
             return jsonify(json_data)
         except Exception as e:
+            print(e)
             return jsonify({"message": "Failed to get posts"}), 500
+
+
+# add comment bởi cordinator
+@app.route("/add_comment_pending", methods=["POST"])
+def add_comment_pending():
+    try:
+        authorization_header = request.headers.get("Authorization")
+        user_id, role = token_to_uid(authorization_header)
+        if "coordinator" not in role and role != "student":
+            return jsonify({"message": "You are not allowed to add comment"}), 403
+        else:
+            comment = request.json
+
+            # Kiểm tra các trường bắt buộc
+            if not all(key in comment for key in ["comment", "post"]):
+                return jsonify({"message": "Missing required fields"}), 400
+
+            # Chuyển đổi chuỗi ObjectId sang ObjectId
+            try:
+                comment["post"] = ObjectId(comment["post"])
+                comment["user"] = ObjectId(user_id)
+            except Exception as e:
+                return jsonify({"message": "Invalid ObjectId format"}), 400
+
+            # Thêm trường created_at nếu không được cung cấp
+            if "created_at" not in comment:
+                comment["created_at"] = datetime.now()
+
+            # Thêm comment vào collection
+            result = CommentPendingModel(db_helper).add_comment_pending(comment)
+
+            # Kiểm tra kết quả và trả về thông báo tương ứng
+            if result.inserted_id:
+                comment_list=get_comment_pending_by_post(comment["post"])
+                print(comment_list)
+                return (
+                    jsonify(
+                        {
+                            "message": "Comment added successfully",
+                            "comment_list": comment_list,
+                        }
+                    ),
+                    200,
+                )
+            else:
+                return jsonify({"message": "Failed to add comment - top"}), 500
+    except Exception as e:
+        print(e)
+        return jsonify({"message": "Failed to add comment - bot"}), 500
 
 def is_in_14days(date):
     date = datetime.strptime(date, "%Y-%m-%d")
@@ -762,43 +899,68 @@ def is_in_14days(date):
         return True
     return False
 
-# create api search title
-@app.route("/search_title", methods=["GET"])
-def search_title():
+@app.route("/approve_post", methods=["POST"])
+def approve_post():
+    data=request.json
+    post_id=data["post_id"]
     authorization_header = request.headers.get("Authorization")
     user_id, role = token_to_uid(authorization_header)
-    if role != "student" and role != "admin" and role != "marketing coordinator" and role != "marketing manager" and role != "cordinator":
-        return jsonify({"message": "You are not allowed to search"}), 403
-    else:
-        try:
-            title = request.args.get("title", "")
-            posts = PostModel(db_helper).search_title(title)
-            json_data = []
-            for post in posts:
-                user_id_post = str(post["user"])
-                user_info = UserModel(db_helper).get_user(user_id_post)
-                post_data = {
-                    "_id": str(post["_id"]),
-                    "user": {
-                        "_id": str(user_info["_id"]),
-                        "name": user_info.get("name", ""),
-                        "email": user_info.get("email", ""),
-                    },
-                    "is_liked": LikeModel(db_helper).is_liked(user_id +"_"+str(post["_id"])),
-                    "caption": post.get("caption", ""),
-                    "description": post.get("description", ""),
-                    "image": post.get("image", ""),
-                    "file": post.get("file", ""),
-                    "likes": post.get("likes", 0),
-                    "comments": post.get("comments", 0),
-                    "comments_list": get_comments_by_post(str(post["_id"])),
-                    "is_anonymous": post.get("is_anonymous", False),
-                    "created_at": calculate_time_difference(post.get("created_at", "")),
-                }
-                json_data.append(post_data)
-            return jsonify(json_data)
-        except Exception as e:
-            return jsonify({"message": "Failed to search"}), 500
+    if "coordinator" not in role:
+        return jsonify({"message": "You are not allowed to approve post"}), 403
+
+    post = PostModel(db_helper).get_post(post_id)
+    author=UserModel(db_helper).get_user(str(post["user"]))
+    user_mail=author["email"]
+    utils.send_email(user_mail, "Bài viết của bạn đã được duyệt và đã được đăng trên trang chủ của Greenwich Blog", "Bài viết của bạn đã được duyệt!!!")
+    if not post:
+        return jsonify({"message": "Post not found"}), 404
+    if post["status"] == "published":
+        return jsonify({"message": "Post has already been approved"}), 400
+    result = PostModel(db_helper).update_post(post_id, {"status": "published"})
+    if not result:
+        return jsonify({"message": "Failed to approve post"}), 500
+    return jsonify({"message": "Post approved successfully"}), 200
+
+    
+
+
+# create api search title
+# @app.route("/search_title", methods=["GET"])
+# def search_title():
+#     authorization_header = request.headers.get("Authorization")
+#     user_id, role = token_to_uid(authorization_header)
+#     if role != "student" and role != "admin" and role != "marketing coordinator" and role != "marketing manager" and role != "cordinator":
+#         return jsonify({"message": "You are not allowed to search"}), 403
+#     else:
+#         try:
+#             title = request.args.get("title", "")
+#             posts = PostModel(db_helper).search_title(title)
+#             json_data = []
+#             for post in posts:
+#                 user_id_post = str(post["user"])
+#                 user_info = UserModel(db_helper).get_user(user_id_post)
+#                 post_data = {
+#                     "_id": str(post["_id"]),
+#                     "user": {
+#                         "_id": str(user_info["_id"]),
+#                         "name": user_info.get("name", ""),
+#                         "email": user_info.get("email", ""),
+#                     },
+#                     "is_liked": LikeModel(db_helper).is_liked(user_id +"_"+str(post["_id"])),
+#                     "caption": post.get("caption", ""),
+#                     "description": post.get("description", ""),
+#                     "image": post.get("image", ""),
+#                     "file": post.get("file", ""),
+#                     "likes": post.get("likes", 0),
+#                     "comments": post.get("comments", 0),
+#                     "comments_list": get_comments_by_post(str(post["_id"])),
+#                     "is_anonymous": post.get("is_anonymous", False),
+#                     "created_at": calculate_time_difference(post.get("created_at", "")),
+#                 }
+#                 json_data.append(post_data)
+#             return jsonify(json_data)
+#         except Exception as e:
+#             return jsonify({"message": "Failed to search"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True,host="0.0.0.0",port=5000)

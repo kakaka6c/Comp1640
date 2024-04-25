@@ -113,25 +113,27 @@ class PostModel:
     def __init__(self, db_helper):
         self.db_helper = db_helper
 
-    def get_posts_by_user(self, user_id):
+    def get_posts_by_user(self, user_id,status="published"):
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
-        return collection.find({"user": ObjectId(user_id)})
+        return collection.find({"user": ObjectId(user_id),"status": status})
 
-    def get_posts_by_faculty(self, faculty_id):
+    def get_posts_by_faculty(self, faculty_id,status=None):
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
-        return collection.find({"faculty": ObjectId(faculty_id)})
+        if status is None:
+            return collection.find({"faculty": ObjectId(faculty_id)})
+        return collection.find({"faculty": ObjectId(faculty_id),"status": status})
 
     def get_posts_by_event(self, event_id):
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
-        return collection.find({"event": ObjectId(event_id)}, sort=[("created_at", -1)])
+        return collection.find({"event": ObjectId(event_id),"status": "published"}, sort=[("created_at", -1)])
 
     def get_all_posts(self):
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
-        return collection.find(sort=[("created_at", -1)])   
+        return collection.find({"status": "published"},sort=[("created_at", -1)])   
 
     def get_post(self, post_id):
         db = self.db_helper.get_db()
@@ -323,3 +325,43 @@ class CoordinatorModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['users']
         return collection.find_one({"_id": ObjectId(coordinator_id)})
+    
+class CommentPendingModel:
+    def __init__(self, db_helper):
+        self.db_helper = db_helper
+
+    def get_comments_pending(self):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments_pending']
+        return collection.find()
+
+    def get_comment_pending(self, comment_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments_pending']
+        return collection.find_one({"_id": ObjectId(comment_id)})
+
+    def get_comments_by_post(self, post_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments_pending']
+        return collection.find({"post": ObjectId(post_id)})
+
+    def add_comment_pending(self, comment):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments_pending']
+        return collection.insert_one(comment)
+
+    def update_comment_pending(self, comment_id, comment):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments_pending']
+        return collection.update_one({"_id": ObjectId(comment_id)}, {"$set": comment})
+
+    def delete_comment_pending(self, comment_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments_pending']
+        return collection.delete_one({"_id": ObjectId(comment_id)})
+
+    def count_comment_pending(self, post_id):
+        db = self.db_helper.get_db()
+        collection = db['comp1640']['comments_pending']
+        return collection.count_documents({"post": ObjectId(post_id)})
+    
