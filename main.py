@@ -23,7 +23,7 @@ from bson import ObjectId
 from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
-app.config["MONGO_URI"] = "mongodb+srv://manhdc01:12345@cluster0.z2zlgel.mongodb.net/"
+app.config["MONGO_URI"] = "mongodb+srv://<USER>:<PASSWORD>@cluster0.z2zlgel.mongodb.net/"
 db_helper = DatabaseHelper(app)
 MAIN_URL="https://comp1640.pythonanywhere.com/"
 # create route for login and return user info
@@ -393,31 +393,18 @@ def add_comment():
             return jsonify({"message": "You are not allowed to add comment"}), 403
         else:
             comment = request.json
-
-            # Kiểm tra các trường bắt buộc
             if not all(key in comment for key in ["comment", "post"]):
                 return jsonify({"message": "Missing required fields"}), 400
-
-            # Chuyển đổi chuỗi ObjectId sang ObjectId
             try:
                 comment["post"] = ObjectId(comment["post"])
                 comment["user"] = ObjectId(user_id)
             except Exception as e:
                 return jsonify({"message": "Invalid ObjectId format"}), 400
-
-            # Check to see if the post has existed for more than 14 days
             post = PostModel(db_helper).get_post(comment["post"])
-            
-            # Thêm trường created_at nếu không được cung cấp
             if "created_at" not in comment:
                 comment["created_at"] = datetime.now()
-
-            # Thêm comment vào collection
             result = CommentModel(db_helper).add_comment(comment)
-
-            # Kiểm tra kết quả và trả về thông báo tương ứng
             if result.inserted_id:
-                # đổi số lượng comment +=1
                 post = PostModel(db_helper).get_post(comment["post"])
                 try:
                     post["comments"]
@@ -440,7 +427,7 @@ def add_comment():
                     200,
                 )
             else:
-                return jsonify({"message": "Failed to add comment - top"}), 500
+                return jsonify({"message": "Failed to add comment"}), 500
     except Exception as e:
         print(e)
         return jsonify({"message": "Failed to add comment - bot"}), 500
@@ -537,24 +524,16 @@ def add_like():
     else:
         try:
             like = request.json
-            # create sample json
             like["user"] = ObjectId(user_id)
             like["created_at"] = datetime.now()
             like["post"] = ObjectId(like["post"])
             like["like_id"] = user_id+"_"+str(like["post"])
-            # check if user liked this post before
-            # if LikeModel(db_helper).is_liked(like["l +"_"+e_id"]):
-            #     return jsonify({"message": "You have already liked this post"}), 400
             try:
                 result = LikeModel(db_helper).add_like(like)
             except Exception as e:
-                print(e)
                 return jsonify({"message": "You want to spam like ?????"}), 500
-            # count likes now
             count = LikeModel(db_helper).count_likes_for_post(like["post"])
-            # update likes count
             PostModel(db_helper).update_post(like["post"], {"likes": count})
-            # return message and current like count
             if result:
                 return jsonify({"message": "Like added successfully", "likes": count}), 200
             else:
