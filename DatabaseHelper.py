@@ -78,12 +78,12 @@ class EventModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['events']
         return collection.find_one({"_id": ObjectId(event_id)})
-    
+
     def get_event_by_faculty(self, faculty_id):
         db = self.db_helper.get_db()
         collection = db['comp1640']['events']
         return collection.find({"faculty": ObjectId(faculty_id)})
-    
+
 class FacultyModel:
     def __init__(self, db_helper):
         self.db_helper = db_helper
@@ -123,7 +123,7 @@ class PostModel:
         collection = db['comp1640']['posts']
         if status is None:
             return collection.find({"faculty": ObjectId(faculty_id)})
-        return collection.find({"faculty": ObjectId(faculty_id),"status": status})
+        return collection.find({"faculty": ObjectId(faculty_id),"status": status}, sort=[("created_at", -1)])
 
     def get_posts_by_event(self, event_id):
         db = self.db_helper.get_db()
@@ -133,7 +133,7 @@ class PostModel:
     def get_all_posts(self):
         db = self.db_helper.get_db()
         collection = db['comp1640']['posts']
-        return collection.find({"status": "published"},sort=[("created_at", -1)])   
+        return collection.find({"status": "published"},sort=[("created_at", -1)])
 
     def get_post(self, post_id):
         db = self.db_helper.get_db()
@@ -325,7 +325,7 @@ class CoordinatorModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['users']
         return collection.find_one({"_id": ObjectId(coordinator_id)})
-    
+
 class CommentPendingModel:
     def __init__(self, db_helper):
         self.db_helper = db_helper
@@ -364,4 +364,3 @@ class CommentPendingModel:
         db = self.db_helper.get_db()
         collection = db['comp1640']['comments_pending']
         return collection.count_documents({"post": ObjectId(post_id)})
-    
